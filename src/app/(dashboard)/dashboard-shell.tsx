@@ -20,6 +20,26 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
+  // Desktop-only collapse: hides the sidebar on lg+ so wide views (the
+  // pipeline board) get the full width. Persisted so the choice sticks
+  // across navigations and sessions. Read after mount to avoid an SSR
+  // hydration mismatch.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    // Sync from the persisted preference after mount. localStorage is
+    // client-only, so reading it during render would break SSR hydration
+    // — the one-shot post-mount setState is the intended pattern here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (localStorage.getItem("sidebar-collapsed") === "1") setCollapsed(true);
+  }, []);
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem("sidebar-collapsed", next ? "1" : "0");
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
@@ -44,9 +64,13 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       {/* Reports this tab's online/away presence once we know a user is
           signed in. Headless — renders nothing. */}
       <PresenceHeartbeat />
-      <Sidebar open={sidebarOpen} onClose={closeSidebar} />
+      <Sidebar open={sidebarOpen} onClose={closeSidebar} collapsed={collapsed} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onOpenSidebar={() => setSidebarOpen(true)} />
+        <Header
+          onOpenSidebar={() => setSidebarOpen(true)}
+          onToggleCollapse={toggleCollapsed}
+          sidebarCollapsed={collapsed}
+        />
         {/* Thinner horizontal padding on mobile so cards have room to breathe. */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>

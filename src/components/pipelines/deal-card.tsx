@@ -1,7 +1,7 @@
 "use client";
 
 import type { Deal, PipelineStage } from "@/types";
-import { Calendar, Check, X } from "lucide-react";
+import { Calendar, Check, X, MessageCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 
@@ -30,16 +30,27 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
   const t = useTranslations("Pipelines.card");
   const contactLabel = deal.contact?.name || deal.contact?.phone || t("noContact");
   const assigneeLabel = deal.assignee?.full_name || null;
+  // Digits-only phone for the wa.me deep link (opens WhatsApp with this lead).
+  const phoneDigits = (deal.contact?.phone || "").replace(/\D/g, "");
+
+  function openEdit(e: React.SyntheticEvent) {
+    if (isOverlay) return;
+    e.stopPropagation();
+    onEdit(deal);
+  }
 
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        // `onClick` still fires after a non-drag tap because the PointerSensor
-        // requires 5px movement before it counts as a drag.
-        if (isOverlay) return;
-        e.stopPropagation();
-        onEdit(deal);
+    // Root is a div (not a button) so the WhatsApp <a> can nest without
+    // producing invalid interactive-inside-interactive markup.
+    <div
+      role="button"
+      tabIndex={isOverlay ? -1 : 0}
+      onClick={openEdit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openEdit(e);
+        }
       }}
       className={`group relative w-full cursor-pointer rounded-xl border border-border/50 bg-muted/70 pl-4 pr-3 py-3 text-left shadow-sm transition-all ${
         isOverlay
@@ -77,7 +88,21 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground">
           {initials(deal.contact?.name, deal.contact?.phone)}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{contactLabel}</span>
+        <span className="flex-1 truncate text-xs text-muted-foreground">{contactLabel}</span>
+        {phoneDigits && !isOverlay && (
+          <a
+            href={`https://wa.me/${phoneDigits}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t("contactWhatsapp")}
+            aria-label={t("contactWhatsapp")}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/15 text-green-500 transition-colors hover:bg-green-500/25"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+          </a>
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between">
@@ -102,6 +127,6 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
           </span>
         </div>
       )}
-    </button>
+    </div>
   );
 }

@@ -151,8 +151,13 @@ export interface ContactNote {
   id: string;
   contact_id: string;
   user_id: string;
-  note_text: string;
+  note_text: string | null;
   created_at: string;
+  /** Attachment (migration 038). Null when the note is text-only. */
+  file_path?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
 }
 
 export type ConversationStatus = 'open' | 'pending' | 'closed';

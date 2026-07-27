@@ -55,7 +55,8 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
-    "menuSignOut": "Sair"
+    "menuSignOut": "Sair",
+    "toggleSidebar": "Recolher/expandir menu"
   },
   "ModeToggle": {
     "switchMode": "Mudar para o modo {mode}"
@@ -261,7 +262,13 @@
       "deals": "Negócios",
       "noTags": "Nenhuma etiqueta",
       "noDeals": "Nenhum negócio",
-      "addNotePlaceholder": "Adicionar uma nota..."
+      "addNotePlaceholder": "Adicionar uma nota...",
+      "attach": "Anexar arquivo",
+      "removeFile": "Remover arquivo",
+      "attachment": "Anexo",
+      "fileTooLarge": "Arquivo muito grande (máx. 16 MB).",
+      "uploadFailed": "Falha ao enviar o arquivo.",
+      "downloadFailed": "Falha ao abrir o arquivo."
     },
     "aiBanner": {
       "pausedTitle": "O assistente de IA está pausado aqui",
@@ -387,7 +394,13 @@
         "title": "Notas internas",
         "placeholder": "Escreva uma nota...",
         "save": "Adicionar nota",
-        "noNotes": "Nenhuma nota ainda."
+        "noNotes": "Nenhuma nota ainda.",
+        "attach": "Anexar arquivo",
+        "removeFile": "Remover arquivo",
+        "attachment": "Anexo",
+        "fileTooLarge": "Arquivo muito grande (máx. 16 MB).",
+        "uploadFailed": "Falha ao enviar o arquivo.",
+        "downloadFailed": "Falha ao abrir o arquivo."
       },
       "dealsTab": {
         "noDeals": "Nenhum negócio ainda"
@@ -494,7 +507,8 @@
       "toastFailedMoveDeal": "Falha ao mover o negócio",
       "toastFailedCreatePipeline": "Falha ao criar o funil",
       "toastPipelineCreated": "Funil criado",
-      "toastNotLinkedToAccount": "Seu perfil não está vinculado a uma conta."
+      "toastNotLinkedToAccount": "Seu perfil não está vinculado a uma conta.",
+      "searchPlaceholder": "Buscar no funil..."
     },
     "board": {
       "dropDealHere": "Solte um negócio aqui",
@@ -503,7 +517,8 @@
     "card": {
       "noContact": "Sem contato",
       "won": "Ganho",
-      "lost": "Perdido"
+      "lost": "Perdido",
+      "contactWhatsapp": "Chamar no WhatsApp"
     },
     "form": {
       "editDeal": "Editar Negócio",

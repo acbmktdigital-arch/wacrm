@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { addContactTag, deleteContactTag } from '@/lib/contacts/tag-api';
+import {
+  uploadAccountMedia,
+  deleteAccountMedia,
+  MEDIA_MAX_BYTES,
+} from '@/lib/storage/upload-media';
 import { useAuth } from '@/hooks/use-auth';
 import { formatCurrency } from '@/lib/currency';
 import { toast } from 'sonner';
@@ -39,6 +44,9 @@ import {
   X,
   DollarSign,
   LayoutTemplate,
+  Paperclip,
+  FileText,
+  Download,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -84,8 +92,10 @@ export function ContactDetailView({
   // Notes tab
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [newNote, setNewNote] = useState('');
+  const [newNoteFile, setNewNoteFile] = useState<File | null>(null);
   const [savingNote, setSavingNote] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const noteFileInputRef = useRef<HTMLInputElement>(null);
 
   // Custom fields tab
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -247,7 +257,12 @@ export function ContactDetailView({
   }
 
   async function addNote() {
-    if (!contactId || !newNote.trim()) return;
+    // A note is valid with text, a file, or both.
+    if (!contactId || (!newNote.trim() && !newNoteFile)) return;
+    if (newNoteFile && newNoteFile.size > MEDIA_MAX_BYTES) {
+      toast.error(t('notesTab.fileTooLarge'));
+      return;
+    }
     setSavingNote(true);
 
     const {
@@ -260,35 +275,89 @@ export function ContactDetailView({
       return;
     }
 
+    // Upload the attachment first (if any). A failed upload aborts the
+    // note so we never store a row pointing at a missing file.
+    let filePath: string | null = null;
+    let fileMeta: { name: string; type: string; size: number } | null = null;
+    if (newNoteFile) {
+      try {
+        const { path } = await uploadAccountMedia('contact-files', newNoteFile);
+        filePath = path;
+        fileMeta = {
+          name: newNoteFile.name,
+          type: newNoteFile.type || 'application/octet-stream',
+          size: newNoteFile.size,
+        };
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : t('notesTab.uploadFailed'),
+        );
+        setSavingNote(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.from('contact_notes').insert({
       contact_id: contactId,
       account_id: accountId,
       user_id: user.id,
-      note_text: newNote.trim(),
+      note_text: newNote.trim() || null,
+      file_path: filePath,
+      file_name: fileMeta?.name ?? null,
+      file_type: fileMeta?.type ?? null,
+      file_size: fileMeta?.size ?? null,
     });
 
     if (error) {
+      // Roll back the orphaned upload so it doesn't linger in storage.
+      if (filePath)
+        void deleteAccountMedia('contact-files', filePath).catch(() => {});
       toast.error(t('toastNoteAddFailed'));
     } else {
       setNewNote('');
+      setNewNoteFile(null);
+      if (noteFileInputRef.current) noteFileInputRef.current.value = '';
       fetchNotes();
       toast.success(t('toastNoteAdded'));
     }
     setSavingNote(false);
   }
 
-  async function deleteNote(noteId: string) {
+  async function deleteNote(note: ContactNote) {
     const { error } = await supabase
       .from('contact_notes')
       .delete()
-      .eq('id', noteId);
+      .eq('id', note.id);
 
     if (error) {
       toast.error(t('toastNoteDeleteFailed'));
     } else {
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+      // Best-effort cleanup of the attached file.
+      if (note.file_path)
+        void deleteAccountMedia('contact-files', note.file_path).catch(() => {});
       toast.success(t('toastNoteDeleted'));
     }
+  }
+
+  // Private bucket → mint a short-lived signed URL on demand and open it.
+  async function openNoteFile(note: ContactNote) {
+    if (!note.file_path) return;
+    const { data, error } = await supabase.storage
+      .from('contact-files')
+      .createSignedUrl(note.file_path, 120);
+    if (error || !data?.signedUrl) {
+      toast.error(t('notesTab.downloadFailed'));
+      return;
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  function formatFileSize(bytes?: number | null): string {
+    if (!bytes || bytes <= 0) return '';
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${Math.round(kb)} KB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
   }
 
   async function saveCustomFields() {
@@ -585,19 +654,69 @@ export function ContactDetailView({
                     placeholder={t('notesTab.placeholder')}
                     className="bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px] text-sm resize-none"
                   />
-                  <Button
-                    onClick={addNote}
-                    disabled={!newNote.trim() || savingNote}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    size="sm"
-                  >
-                    {savingNote ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Plus className="size-3.5" />
-                    )}
-                    {t('notesTab.save')}
-                  </Button>
+
+                  {/* Selected attachment preview (before saving). */}
+                  {newNoteFile && (
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-2.5 py-1.5 text-xs">
+                      <FileText className="size-3.5 shrink-0 text-primary" />
+                      <span
+                        className="flex-1 truncate text-foreground"
+                        title={newNoteFile.name}
+                      >
+                        {newNoteFile.name}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground">
+                        {formatFileSize(newNoteFile.size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewNoteFile(null);
+                          if (noteFileInputRef.current)
+                            noteFileInputRef.current.value = '';
+                        }}
+                        className="shrink-0 text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                        aria-label={t('notesTab.removeFile')}
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={noteFileInputRef}
+                    type="file"
+                    onChange={(e) =>
+                      setNewNoteFile(e.target.files?.[0] ?? null)
+                    }
+                    className="hidden"
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => noteFileInputRef.current?.click()}
+                      className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    >
+                      <Paperclip className="size-3.5" />
+                      {t('notesTab.attach')}
+                    </Button>
+                    <Button
+                      onClick={addNote}
+                      disabled={(!newNote.trim() && !newNoteFile) || savingNote}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                      size="sm"
+                    >
+                      {savingNote ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="size-3.5" />
+                      )}
+                      {t('notesTab.save')}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2">
@@ -616,11 +735,36 @@ export function ContactDetailView({
                         className="rounded-lg bg-muted/50 border border-border/50 p-3 group"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap flex-1">
-                            {note.note_text}
-                          </p>
+                          <div className="min-w-0 flex-1 space-y-2">
+                            {note.note_text && (
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {note.note_text}
+                              </p>
+                            )}
+                            {note.file_path && (
+                              <button
+                                type="button"
+                                onClick={() => openNoteFile(note)}
+                                className="flex w-full items-center gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/40 hover:bg-muted cursor-pointer"
+                              >
+                                <FileText className="size-4 shrink-0 text-primary" />
+                                <span
+                                  className="flex-1 truncate text-foreground"
+                                  title={note.file_name ?? undefined}
+                                >
+                                  {note.file_name ?? t('notesTab.attachment')}
+                                </span>
+                                {note.file_size ? (
+                                  <span className="shrink-0 text-muted-foreground">
+                                    {formatFileSize(note.file_size)}
+                                  </span>
+                                ) : null}
+                                <Download className="size-3.5 shrink-0 text-muted-foreground" />
+                              </button>
+                            )}
+                          </div>
                           <button
-                            onClick={() => deleteNote(note.id)}
+                            onClick={() => deleteNote(note)}
                             className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all cursor-pointer shrink-0"
                           >
                             <Trash2 className="size-3.5" />
