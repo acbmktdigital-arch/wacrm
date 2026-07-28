@@ -510,7 +510,7 @@
       "toastFailedCreatePipeline": "Failed to create pipeline",
       "toastPipelineCreated": "Pipeline created",
       "toastNotLinkedToAccount": "Your profile is not linked to an account.",
-      "searchPlaceholder": "Search pipeline..."
+      "searchPlaceholder": "Search (name, phone, city…)"
     },
     "board": {
       "dropDealHere": "Drop a deal here",

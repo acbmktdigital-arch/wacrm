@@ -510,7 +510,7 @@
       "toastFailedCreatePipeline": "Falha ao criar o funil",
       "toastPipelineCreated": "Funil criado",
       "toastNotLinkedToAccount": "Seu perfil não está vinculado a uma conta.",
-      "searchPlaceholder": "Buscar no funil..."
+      "searchPlaceholder": "Buscar (nome, telefone, cidade…)"
     },
     "board": {
       "dropDealHere": "Solte um negócio aqui",

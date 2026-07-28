@@ -45,6 +45,19 @@ const SPEC_DEFAULT_STAGES = [
   { name: "Ganho", color: "#22c55e", position: 4 }, // green
 ];
 
+/** Flatten a contact's embedded tag names into one searchable string.
+ *  The deals query embeds them as contact_tags(tags(name)). */
+function contactTagNames(contact: unknown): string {
+  const tags = (
+    contact as
+      | { contact_tags?: Array<{ tags?: { name?: string } | null }> }
+      | null
+      | undefined
+  )?.contact_tags;
+  if (!tags) return "";
+  return tags.map((t) => t.tags?.name ?? "").join(" ");
+}
+
 export default function PipelinesPage() {
   const t = useTranslations("Pipelines.page");
   const supabase = createClient();
@@ -59,18 +72,26 @@ export default function PipelinesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  // Client-side filter for the board: matches deal title, contact name
-  // or phone. Analytics keeps the full set so totals don't jump around
-  // while you search.
+  // Client-side filter for the board: matches deal title, contact name,
+  // phone, or the contact's tag names (so a city/category like "Montes
+  // Claros" finds every lead tagged with it, not just those with the
+  // city in the business name). Analytics keeps the full set so totals
+  // don't jump around while you search.
   const visibleDeals = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return deals;
-    return deals.filter(
-      (d) =>
-        (d.title || "").toLowerCase().includes(q) ||
-        (d.contact?.name || "").toLowerCase().includes(q) ||
-        (d.contact?.phone || "").toLowerCase().includes(q),
-    );
+    return deals.filter((d) => {
+      const haystack = [
+        d.title,
+        d.contact?.name,
+        d.contact?.phone,
+        contactTagNames(d.contact),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
   }, [deals, search]);
 
   // Dialog / sheet state
@@ -116,7 +137,11 @@ export default function PipelinesPage() {
     async (pipelineId: string) => {
       const { data } = await supabase
         .from("deals")
-        .select("*, contact:contacts(*), assignee:profiles!deals_assigned_to_fkey(*)")
+        // Embed the contact's tag names too, so the search box can match
+        // by city/category (which live as tags, not in the deal title).
+        .select(
+          "*, contact:contacts(*, contact_tags(tags(name))), assignee:profiles!deals_assigned_to_fkey(*)",
+        )
         .eq("pipeline_id", pipelineId)
         .order("created_at", { ascending: false });
       return (data ?? []) as Deal[];
