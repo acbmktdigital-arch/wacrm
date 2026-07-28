@@ -268,7 +268,8 @@
       "attachment": "Anexo",
       "fileTooLarge": "Arquivo muito grande (máx. 16 MB).",
       "uploadFailed": "Falha ao enviar o arquivo.",
-      "downloadFailed": "Falha ao abrir o arquivo."
+      "downloadFailed": "Falha ao abrir o arquivo.",
+      "unknownAuthor": "Membro"
     },
     "aiBanner": {
       "pausedTitle": "O assistente de IA está pausado aqui",
@@ -400,7 +401,8 @@
         "attachment": "Anexo",
         "fileTooLarge": "Arquivo muito grande (máx. 16 MB).",
         "uploadFailed": "Falha ao enviar o arquivo.",
-        "downloadFailed": "Falha ao abrir o arquivo."
+        "downloadFailed": "Falha ao abrir o arquivo.",
+        "unknownAuthor": "Membro"
       },
       "dealsTab": {
         "noDeals": "Nenhum negócio ainda"
@@ -1697,5 +1699,16 @@
       "reindexTooltip": "Reindexar todos os documentos (ex.: após adicionar uma chave de embeddings)",
       "loading": "Carregando…"
     }
+  },
+  "Notifications": {
+    "title": "Notificações",
+    "subtitle": "As conversas e negócios que colegas atribuem a você aparecem aqui.",
+    "markAllRead": "Marcar todas como lidas",
+    "emptyTitle": "Nenhuma notificação ainda",
+    "emptyBody": "Você verá um alerta aqui quando alguém atribuir uma conversa ou um negócio a você.",
+    "unread": "Não lida",
+    "retry": "Tentar de novo",
+    "toastMarkReadFailed": "Falha ao marcar como lida",
+    "toastMarkAllFailed": "Falha ao marcar todas como lidas"
   }
 }

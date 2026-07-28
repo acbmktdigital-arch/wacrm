@@ -96,6 +96,8 @@ export function ContactDetailView({
   const [savingNote, setSavingNote] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
+  // Map of note author (auth user_id) → display name, for the note history.
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
 
   // Custom fields tab
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -155,6 +157,18 @@ export function ContactDetailView({
     setLoadingNotes(false);
   }, [contactId, supabase]);
 
+  // Resolve note authors (team members) → names for the note history.
+  const fetchAuthors = useCallback(async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, full_name');
+    if (data) {
+      const map: Record<string, string> = {};
+      for (const p of data) map[p.user_id] = (p.full_name ?? '').trim();
+      setAuthorNames(map);
+    }
+  }, [supabase]);
+
   const fetchCustomFields = useCallback(async () => {
     if (!contactId) return;
     setLoadingCustom(true);
@@ -195,10 +209,11 @@ export function ContactDetailView({
       fetchContact();
       fetchTags();
       fetchNotes();
+      fetchAuthors();
       fetchCustomFields();
       fetchDeals();
     }
-  }, [open, contactId, fetchContact, fetchTags, fetchNotes, fetchCustomFields, fetchDeals]);
+  }, [open, contactId, fetchContact, fetchTags, fetchNotes, fetchAuthors, fetchCustomFields, fetchDeals]);
 
   async function copyPhone() {
     if (!contact) return;
@@ -771,9 +786,13 @@ export function ContactDetailView({
                           </button>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5">
-                          {new Date(note.created_at).toLocaleDateString('en-US', {
+                          <span className="font-medium text-foreground/80">
+                            {authorNames[note.user_id] || t('notesTab.unknownAuthor')}
+                          </span>
+                          {' · '}
+                          {new Date(note.created_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
                             month: 'short',
-                            day: 'numeric',
                             year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',

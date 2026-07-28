@@ -268,7 +268,8 @@
       "attachment": "Attachment",
       "fileTooLarge": "File too large (max 16 MB).",
       "uploadFailed": "Failed to upload the file.",
-      "downloadFailed": "Failed to open the file."
+      "downloadFailed": "Failed to open the file.",
+      "unknownAuthor": "Member"
     },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
@@ -400,7 +401,8 @@
         "attachment": "Attachment",
         "fileTooLarge": "File too large (max 16 MB).",
         "uploadFailed": "Failed to upload the file.",
-        "downloadFailed": "Failed to open the file."
+        "downloadFailed": "Failed to open the file.",
+        "unknownAuthor": "Member"
       },
       "dealsTab": {
         "noDeals": "No deals yet"
@@ -1697,5 +1699,16 @@
       "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
       "loading": "Loading…"
     }
+  },
+  "Notifications": {
+    "title": "Notifications",
+    "subtitle": "Conversations and deals teammates assign to you show up here.",
+    "markAllRead": "Mark all as read",
+    "emptyTitle": "No notifications yet",
+    "emptyBody": "You will see an alert here when someone assigns you a conversation or a deal.",
+    "unread": "Unread",
+    "retry": "Retry",
+    "toastMarkReadFailed": "Failed to mark notification as read",
+    "toastMarkAllFailed": "Failed to mark all as read"
   }
 }

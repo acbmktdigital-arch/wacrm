@@ -48,14 +48,16 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const [newNoteFile, setNewNoteFile] = useState<File | null>(null);
   const [addingNote, setAddingNote] = useState(false);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
+  // Note author (auth user_id) → display name, for the note history.
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
 
   const fetchContactData = useCallback(async () => {
     if (!contact) return;
 
     const supabase = createClient();
 
-    // Fetch deals, notes, and tags in parallel
-    const [dealsRes, notesRes, tagsRes] = await Promise.all([
+    // Fetch deals, notes, tags, and member names in parallel
+    const [dealsRes, notesRes, tagsRes, profilesRes] = await Promise.all([
       supabase
         .from("deals")
         .select("*, stage:pipeline_stages(*)")
@@ -70,10 +72,17 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         .from("contact_tags")
         .select("id, tag_id, tags(*)")
         .eq("contact_id", contact.id),
+      supabase.from("profiles").select("user_id, full_name"),
     ]);
 
     if (dealsRes.data) setDeals(dealsRes.data);
     if (notesRes.data) setNotes(notesRes.data);
+    if (profilesRes.data) {
+      const map: Record<string, string> = {};
+      for (const p of profilesRes.data as { user_id: string; full_name: string | null }[])
+        map[p.user_id] = (p.full_name ?? "").trim();
+      setAuthorNames(map);
+    }
     if (tagsRes.data) {
       const mapped = tagsRes.data
         .filter((ct: Record<string, unknown>) => ct.tags)
@@ -427,7 +436,11 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
                       </button>
                     )}
                     <p className="mt-1 text-[10px] text-muted-foreground">
-                      {format(new Date(note.created_at), "MMM d, yyyy HH:mm")}
+                      <span className="font-medium text-foreground/80">
+                        {authorNames[note.user_id] || tSidebar("unknownAuthor")}
+                      </span>
+                      {" · "}
+                      {format(new Date(note.created_at), "dd/MM/yyyy HH:mm")}
                     </p>
                   </div>
                 ))}
