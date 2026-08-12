@@ -852,7 +852,8 @@
         "wait": "Aguardar",
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar Webhook",
-        "close_conversation": "Encerrar Conversa"
+        "close_conversation": "Encerrar Conversa",
+        "move_deal": "Mover negócio de etapa"
       },
       "triggers": {
         "new_message_received": {
@@ -989,7 +990,8 @@
         "matchType": "Tipo de correspondência",
         "matchContains": "Contém",
         "matchExact": "Exata",
-        "closeConversationHint": "Define o status da conversa como \"encerrada\". Nenhuma configuração necessária."
+        "closeConversationHint": "Define o status da conversa como \"encerrada\". Nenhuma configuração necessária.",
+        "moveDealHint": "Move o negócio ABERTO deste contato (neste funil) para a etapa escolhida. Se o contato não tiver um negócio aberto nesse funil, nada acontece."
       }
     }
   },

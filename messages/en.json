@@ -852,7 +852,8 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "move_deal": "Move Deal"
       },
       "triggers": {
         "new_message_received": {
@@ -989,7 +990,8 @@
         "matchType": "Match type",
         "matchContains": "Contains",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "moveDealHint": "Moves this contact's OPEN deal (in this funnel) to the chosen stage. If the contact has no open deal in that funnel, nothing happens."
       }
     }
   },

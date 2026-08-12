@@ -16,6 +16,7 @@ import type {
   UpdateContactFieldStepConfig,
   WaitStepConfig,
   CreateDealStepConfig,
+  MoveDealStepConfig,
   AssignConversationStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
@@ -574,6 +575,33 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         status: 'open',
       })
       return 'deal created'
+    }
+
+    case 'move_deal': {
+      const cfg = step.step_config as MoveDealStepConfig
+      if (!cfg.pipeline_id || !cfg.stage_id) throw new Error('move_deal needs pipeline + stage')
+      if (!args.contactId) throw new Error('move_deal needs a contact')
+      // Move the contact's most recent OPEN deal in this funnel to the
+      // target stage. Scoped to the account (tenancy) and to open deals so
+      // won/lost cards aren't dragged back into the pipeline. No-op (not an
+      // error) when the contact has no open deal in that funnel yet.
+      const { data: deal } = await db
+        .from('deals')
+        .select('id')
+        .eq('account_id', args.automation.account_id)
+        .eq('contact_id', args.contactId)
+        .eq('pipeline_id', cfg.pipeline_id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!deal) return 'no open deal to move'
+      await db
+        .from('deals')
+        .update({ stage_id: cfg.stage_id, updated_at: new Date().toISOString() })
+        .eq('id', deal.id)
+        .eq('account_id', args.automation.account_id)
+      return 'deal moved'
     }
 
     case 'send_webhook': {

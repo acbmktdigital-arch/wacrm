@@ -458,6 +458,7 @@ export type AutomationStepType =
   | 'assign_conversation'
   | 'update_contact_field'
   | 'create_deal'
+  | 'move_deal'
   | 'wait'
   | 'condition'
   | 'send_webhook'
@@ -541,6 +542,13 @@ export interface CreateDealStepConfig {
   value?: number;
 }
 
+export interface MoveDealStepConfig {
+  /** Which funnel the contact's deal lives in. */
+  pipeline_id: string;
+  /** Target stage to move the contact's open deal to. */
+  stage_id: string;
+}
+
 export interface WaitStepConfig {
   amount: number;
   unit: 'minutes' | 'hours' | 'days';
@@ -575,6 +583,7 @@ export type AutomationStepConfig =
   | AssignConversationStepConfig
   | UpdateContactFieldStepConfig
   | CreateDealStepConfig
+  | MoveDealStepConfig
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
