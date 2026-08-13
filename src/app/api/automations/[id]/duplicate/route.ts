@@ -12,8 +12,10 @@ export async function POST(
   // Duplicating creates a new automation row — a write. Enforce `agent`
   // (the service-role client below bypasses the agent-gated
   // automations_insert RLS).
+  let accountId: string
   try {
-    await requireRole('agent')
+    const ctx = await requireRole('agent')
+    accountId = ctx.accountId
   } catch (err) {
     return toErrorResponse(err)
   }
@@ -25,11 +27,13 @@ export async function POST(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = supabaseAdmin()
+  // Scope by account (not creator) so any teammate can duplicate an
+  // automation, matching the account-shared model since migration 017.
   const { data: original, error: origErr } = await admin
     .from('automations')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('account_id', accountId)
     .maybeSingle()
   if (origErr) return NextResponse.json({ error: origErr.message }, { status: 500 })
   if (!original) return NextResponse.json({ error: 'Not found' }, { status: 404 })
