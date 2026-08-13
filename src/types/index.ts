@@ -107,6 +107,8 @@ export interface Contact {
   name?: string;
   email?: string;
   company?: string;
+  /** Street address — first-class field since migration 040. */
+  address?: string;
   avatar_url?: string;
   created_at: string;
   updated_at: string;

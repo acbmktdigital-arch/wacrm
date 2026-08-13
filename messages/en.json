@@ -360,7 +360,9 @@
       "phoneRequired": "Phone number is required",
       "tagSearchPlaceholder": "Search tag...",
       "noTagsMatch": "No tags found",
-      "tagsSelected": "{count} selected"
+      "tagsSelected": "{count} selected",
+      "addressLabel": "Address",
+      "addressPlaceholder": "Street, number, neighborhood, city"
     },
     "detailView": {
       "tabs": {
@@ -428,7 +430,8 @@
       "toastCustomFieldsSaved": "Custom fields saved",
       "toastCustomFieldsFailed": "Failed to save custom fields",
       "toastTemplateSent": "Template \"{name}\" sent",
-      "toastTemplateFailed": "Failed to send template: {reason}"
+      "toastTemplateFailed": "Failed to send template: {reason}",
+      "address": "Address"
     },
     "importModal": {
       "title": "Import Contacts",
