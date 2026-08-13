@@ -69,6 +69,9 @@ export function ContactForm({
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
+  // Filter for the tag picker — accounts can have 100+ tags (e.g. one per
+  // city/category after a bulk import), which would otherwise flood the form.
+  const [tagQuery, setTagQuery] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -78,6 +81,7 @@ export function ContactForm({
       setCompany(contact?.company ?? '');
       setSelectedTagIds(contactTags.map((ct) => ct.tag_id));
       setDupMatch(null);
+      setTagQuery('');
       fetchTags();
     }
   }, [open, contact]);
@@ -220,9 +224,14 @@ export function ContactForm({
     }
   }
 
+  const tagFilter = tagQuery.trim().toLowerCase();
+  const visibleTags = tagFilter
+    ? tags.filter((tg) => tg.name.toLowerCase().includes(tagFilter))
+    : tags;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-popover border-border text-popover-foreground sm:max-w-md">
+      <DialogContent className="bg-popover border-border text-popover-foreground sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-popover-foreground">
             {isEdit ? t('editTitle') : t('addTitle')}
@@ -324,7 +333,14 @@ export function ContactForm({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-muted-foreground">{t('tagsLabel')}</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-muted-foreground">{t('tagsLabel')}</Label>
+              {selectedTagIds.length > 0 && (
+                <span className="text-[11px] text-muted-foreground">
+                  {t('tagsSelected', { count: selectedTagIds.length })}
+                </span>
+              )}
+            </div>
             {loadingTags ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 className="size-3 animate-spin" />
@@ -335,30 +351,48 @@ export function ContactForm({
                 {t('noTagsAvailable')}
               </p>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {tags.map((tag) => {
-                  const selected = selectedTagIds.includes(tag.id);
-                  return (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => toggleTag(tag.id)}
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${
-                        selected
-                          ? 'ring-2 ring-primary ring-offset-1 ring-offset-border'
-                          : 'opacity-60 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: tag.color + '20',
-                        color: tag.color,
-                        borderColor: tag.color,
-                      }}
-                    >
-                      {tag.name}
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                {tags.length > 12 && (
+                  <Input
+                    value={tagQuery}
+                    onChange={(e) => setTagQuery(e.target.value)}
+                    placeholder={t('tagSearchPlaceholder')}
+                    className="h-8 bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                )}
+                {/* Capped, scrollable area so a large tag list can't push
+                    the form fields and buttons off the screen. */}
+                <div className="flex max-h-40 flex-wrap content-start gap-1.5 overflow-y-auto rounded-md border border-border/60 bg-background/40 p-2">
+                  {visibleTags.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t('noTagsMatch')}
+                    </p>
+                  ) : (
+                    visibleTags.map((tag) => {
+                      const selected = selectedTagIds.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.id)}
+                          className={`inline-flex h-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${
+                            selected
+                              ? 'ring-2 ring-primary ring-offset-1 ring-offset-border'
+                              : 'opacity-60 hover:opacity-100'
+                          }`}
+                          style={{
+                            backgroundColor: tag.color + '20',
+                            color: tag.color,
+                            borderColor: tag.color,
+                          }}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
             )}
           </div>
 

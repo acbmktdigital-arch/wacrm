@@ -357,7 +357,10 @@
       "dupSimilar": "Já existe um contato com um número muito parecido.",
       "loadingTags": "Carregando etiquetas...",
       "noTagsAvailable": "Nenhuma etiqueta disponível. Crie etiquetas em Configurações.",
-      "phoneRequired": "O número de telefone é obrigatório"
+      "phoneRequired": "O número de telefone é obrigatório",
+      "tagSearchPlaceholder": "Buscar etiqueta...",
+      "noTagsMatch": "Nenhuma etiqueta encontrada",
+      "tagsSelected": "{count} selecionada(s)"
     },
     "detailView": {
       "tabs": {
