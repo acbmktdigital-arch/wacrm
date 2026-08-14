@@ -107,6 +107,8 @@ export interface Contact {
   name?: string;
   email?: string;
   company?: string;
+  /** Street address — first-class field since migration 040. */
+  address?: string;
   avatar_url?: string;
   created_at: string;
   updated_at: string;
@@ -151,8 +153,13 @@ export interface ContactNote {
   id: string;
   contact_id: string;
   user_id: string;
-  note_text: string;
+  note_text: string | null;
   created_at: string;
+  /** Attachment (migration 038). Null when the note is text-only. */
+  file_path?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
 }
 
 export type ConversationStatus = 'open' | 'pending' | 'closed';
@@ -187,7 +194,7 @@ export interface Conversation {
 // Notifications (migration 027)
 // ============================================================
 
-export type NotificationType = 'conversation_assigned';
+export type NotificationType = 'conversation_assigned' | 'deal_assigned';
 
 export interface Notification {
   id: string;
@@ -196,6 +203,8 @@ export interface Notification {
   user_id: string;
   type: NotificationType;
   conversation_id?: string;
+  /** Set for deal_assigned notifications — links to the funnel. */
+  deal_id?: string;
   contact_id?: string;
   /** Who triggered it. Null when an automation/system assigned it. */
   actor_user_id?: string;
@@ -451,6 +460,7 @@ export type AutomationStepType =
   | 'assign_conversation'
   | 'update_contact_field'
   | 'create_deal'
+  | 'move_deal'
   | 'wait'
   | 'condition'
   | 'send_webhook'
@@ -534,6 +544,13 @@ export interface CreateDealStepConfig {
   value?: number;
 }
 
+export interface MoveDealStepConfig {
+  /** Which funnel the contact's deal lives in. */
+  pipeline_id: string;
+  /** Target stage to move the contact's open deal to. */
+  stage_id: string;
+}
+
 export interface WaitStepConfig {
   amount: number;
   unit: 'minutes' | 'hours' | 'days';
@@ -568,6 +585,7 @@ export type AutomationStepConfig =
   | AssignConversationStepConfig
   | UpdateContactFieldStepConfig
   | CreateDealStepConfig
+  | MoveDealStepConfig
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig

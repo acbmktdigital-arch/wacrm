@@ -55,7 +55,7 @@ export function DealForm({
 }: DealFormProps) {
   const t = useTranslations("Pipelines.form");
   const supabase = createClient();
-  const { accountId, defaultCurrency } = useAuth();
+  const { accountId, defaultCurrency, user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
@@ -203,6 +203,21 @@ export function DealForm({
         setSaving(false);
         return;
       }
+    }
+
+    // Option B: mirror this deal's note into the contact's note history
+    // (author + timestamp shown there) whenever the note is new or changed,
+    // so the contact keeps a chronological record of what was done. The
+    // deal already saved above — a failed history write must not block it.
+    const trimmedNotes = notes.trim();
+    const notesChanged = !deal || trimmedNotes !== (deal.notes ?? "").trim();
+    if (trimmedNotes && notesChanged && contactId && accountId && user) {
+      await supabase.from("contact_notes").insert({
+        contact_id: contactId,
+        account_id: accountId,
+        user_id: user.id,
+        note_text: `💼 ${title.trim()}: ${trimmedNotes}`,
+      });
     }
 
     setSaving(false);

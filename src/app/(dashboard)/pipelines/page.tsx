@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Pipeline, PipelineStage, Deal } from "@/types";
 import { PipelineBoard } from "@/components/pipelines/pipeline-board";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GitBranch, Plus, ChevronDown, Settings } from "lucide-react";
+import { GitBranch, Plus, ChevronDown, Settings, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useCan } from "@/hooks/use-can";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,6 +45,19 @@ const SPEC_DEFAULT_STAGES = [
   { name: "Ganho", color: "#22c55e", position: 4 }, // green
 ];
 
+/** Flatten a contact's embedded tag names into one searchable string.
+ *  The deals query embeds them as contact_tags(tags(name)). */
+function contactTagNames(contact: unknown): string {
+  const tags = (
+    contact as
+      | { contact_tags?: Array<{ tags?: { name?: string } | null }> }
+      | null
+      | undefined
+  )?.contact_tags;
+  if (!tags) return "";
+  return tags.map((t) => t.tags?.name ?? "").join(" ");
+}
+
 export default function PipelinesPage() {
   const t = useTranslations("Pipelines.page");
   const supabase = createClient();
@@ -57,6 +70,29 @@ export default function PipelinesPage() {
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  // Client-side filter for the board: matches deal title, contact name,
+  // phone, or the contact's tag names (so a city/category like "Montes
+  // Claros" finds every lead tagged with it, not just those with the
+  // city in the business name). Analytics keeps the full set so totals
+  // don't jump around while you search.
+  const visibleDeals = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return deals;
+    return deals.filter((d) => {
+      const haystack = [
+        d.title,
+        d.contact?.name,
+        d.contact?.phone,
+        contactTagNames(d.contact),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [deals, search]);
 
   // Dialog / sheet state
   const [newPipelineOpen, setNewPipelineOpen] = useState(false);
@@ -101,7 +137,11 @@ export default function PipelinesPage() {
     async (pipelineId: string) => {
       const { data } = await supabase
         .from("deals")
-        .select("*, contact:contacts(*), assignee:profiles!deals_assigned_to_fkey(*)")
+        // Embed the contact's tag names too, so the search box can match
+        // by city/category (which live as tags, not in the deal title).
+        .select(
+          "*, contact:contacts(*, contact_tags(tags(name))), assignee:profiles!deals_assigned_to_fkey(*)",
+        )
         .eq("pipeline_id", pipelineId)
         .order("created_at", { ascending: false });
       return (data ?? []) as Deal[];
@@ -364,6 +404,18 @@ export default function PipelinesPage() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {selectedPipeline && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("searchPlaceholder")}
+                className="h-9 w-44 border-border bg-card pl-8 text-foreground sm:w-64"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -415,7 +467,7 @@ export default function PipelinesPage() {
           <PipelineAnalytics stages={stages} deals={deals} />
           <PipelineBoard
             stages={stages}
-            deals={deals}
+            deals={visibleDeals}
             onDealMoved={handleDealMoved}
             onAddDeal={handleAddDeal}
             onEditDeal={handleEditDeal}

@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import {
+  uploadAccountMedia,
+  deleteAccountMedia,
+  MEDIA_MAX_BYTES,
+} from "@/lib/storage/upload-media";
 import type { Contact, Deal, ContactNote, Tag } from "@/types";
 import {
   Phone,
@@ -15,9 +20,14 @@ import {
   DollarSign,
   StickyNote,
   Plus,
+  Paperclip,
+  FileText,
+  Download,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { useTranslations } from "next-intl";
 
@@ -35,15 +45,19 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [tags, setTags] = useState<(Tag & { contact_tag_id: string })[]>([]);
   const [newNote, setNewNote] = useState("");
+  const [newNoteFile, setNewNoteFile] = useState<File | null>(null);
   const [addingNote, setAddingNote] = useState(false);
+  const noteFileInputRef = useRef<HTMLInputElement>(null);
+  // Note author (auth user_id) → display name, for the note history.
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
 
   const fetchContactData = useCallback(async () => {
     if (!contact) return;
 
     const supabase = createClient();
 
-    // Fetch deals, notes, and tags in parallel
-    const [dealsRes, notesRes, tagsRes] = await Promise.all([
+    // Fetch deals, notes, tags, and member names in parallel
+    const [dealsRes, notesRes, tagsRes, profilesRes] = await Promise.all([
       supabase
         .from("deals")
         .select("*, stage:pipeline_stages(*)")
@@ -58,10 +72,17 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         .from("contact_tags")
         .select("id, tag_id, tags(*)")
         .eq("contact_id", contact.id),
+      supabase.from("profiles").select("user_id, full_name"),
     ]);
 
     if (dealsRes.data) setDeals(dealsRes.data);
     if (notesRes.data) setNotes(notesRes.data);
+    if (profilesRes.data) {
+      const map: Record<string, string> = {};
+      for (const p of profilesRes.data as { user_id: string; full_name: string | null }[])
+        map[p.user_id] = (p.full_name ?? "").trim();
+      setAuthorNames(map);
+    }
     if (tagsRes.data) {
       const mapped = tagsRes.data
         .filter((ct: Record<string, unknown>) => ct.tags)
@@ -91,8 +112,12 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   }, [contact]);
 
   const handleAddNote = useCallback(async () => {
-    if (!contact || !newNote.trim()) return;
+    if (!contact || (!newNote.trim() && !newNoteFile)) return;
     if (!accountId) return;
+    if (newNoteFile && newNoteFile.size > MEDIA_MAX_BYTES) {
+      toast.error(tSidebar("fileTooLarge"));
+      return;
+    }
     setAddingNote(true);
 
     const supabase = createClient();
@@ -101,13 +126,39 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     } = await supabase.auth.getSession();
     const user = session?.user;
 
+    // Upload the attachment first (if any); abort the note on failure so
+    // we never store a row pointing at a missing file.
+    let filePath: string | null = null;
+    let fileMeta: { name: string; type: string; size: number } | null = null;
+    if (newNoteFile) {
+      try {
+        const { path } = await uploadAccountMedia("contact-files", newNoteFile);
+        filePath = path;
+        fileMeta = {
+          name: newNoteFile.name,
+          type: newNoteFile.type || "application/octet-stream",
+          size: newNoteFile.size,
+        };
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : tSidebar("uploadFailed"),
+        );
+        setAddingNote(false);
+        return;
+      }
+    }
+
     const { data, error } = await supabase
       .from("contact_notes")
       .insert({
         contact_id: contact.id,
         account_id: accountId,
         user_id: user?.id,
-        note_text: newNote.trim(),
+        note_text: newNote.trim() || null,
+        file_path: filePath,
+        file_name: fileMeta?.name ?? null,
+        file_type: fileMeta?.type ?? null,
+        file_size: fileMeta?.size ?? null,
       })
       .select()
       .single();
@@ -115,9 +166,36 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     if (!error && data) {
       setNotes((prev) => [data, ...prev]);
       setNewNote("");
+      setNewNoteFile(null);
+      if (noteFileInputRef.current) noteFileInputRef.current.value = "";
+    } else if (error) {
+      if (filePath)
+        void deleteAccountMedia("contact-files", filePath).catch(() => {});
+      toast.error(tSidebar("uploadFailed"));
     }
     setAddingNote(false);
-  }, [contact, newNote, accountId]);
+  }, [contact, newNote, newNoteFile, accountId, tSidebar]);
+
+  // Private bucket → mint a short-lived signed URL on demand and open it.
+  const openNoteFile = useCallback(async (note: ContactNote) => {
+    if (!note.file_path) return;
+    const supabase = createClient();
+    const { data, error } = await supabase.storage
+      .from("contact-files")
+      .createSignedUrl(note.file_path, 120);
+    if (error || !data?.signedUrl) {
+      toast.error(tSidebar("downloadFailed"));
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }, [tSidebar]);
+
+  function formatFileSize(bytes?: number | null): string {
+    if (!bytes || bytes <= 0) return "";
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${Math.round(kb)} KB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
+  }
 
   if (!contact) {
     return (
@@ -273,11 +351,54 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
                   size="sm"
                   className="h-auto bg-primary px-2 hover:bg-primary/90"
                   onClick={handleAddNote}
-                  disabled={!newNote.trim() || addingNote}
+                  disabled={(!newNote.trim() && !newNoteFile) || addingNote}
                 >
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
+
+              {/* Attach control + selected-file preview */}
+              <input
+                ref={noteFileInputRef}
+                type="file"
+                onChange={(e) => setNewNoteFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              {newNoteFile ? (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-2 py-1.5 text-[11px]">
+                  <FileText className="size-3.5 shrink-0 text-primary" />
+                  <span
+                    className="flex-1 truncate text-foreground"
+                    title={newNoteFile.name}
+                  >
+                    {newNoteFile.name}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatFileSize(newNoteFile.size)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewNoteFile(null);
+                      if (noteFileInputRef.current)
+                        noteFileInputRef.current.value = "";
+                    }}
+                    className="shrink-0 text-muted-foreground hover:text-red-400"
+                    aria-label={tSidebar("removeFile")}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => noteFileInputRef.current?.click()}
+                  className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Paperclip className="size-3" />
+                  {tSidebar("attach")}
+                </button>
+              )}
 
               <div className="mt-2 space-y-2">
                 {notes.map((note) => (
@@ -285,11 +406,41 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
                     key={note.id}
                     className="rounded-lg bg-muted px-3 py-2"
                   >
-                    <p className="whitespace-pre-wrap text-xs text-muted-foreground">
-                      {note.note_text}
-                    </p>
+                    {note.note_text && (
+                      <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                        {note.note_text}
+                      </p>
+                    )}
+                    {note.file_path && (
+                      <button
+                        type="button"
+                        onClick={() => openNoteFile(note)}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-lg border border-border bg-background/60 px-2 py-1.5 text-left text-[11px] transition-colors hover:border-primary/40 hover:bg-muted",
+                          note.note_text && "mt-1.5",
+                        )}
+                      >
+                        <FileText className="size-3.5 shrink-0 text-primary" />
+                        <span
+                          className="flex-1 truncate text-foreground"
+                          title={note.file_name ?? undefined}
+                        >
+                          {note.file_name ?? tSidebar("attachment")}
+                        </span>
+                        {note.file_size ? (
+                          <span className="shrink-0 text-muted-foreground">
+                            {formatFileSize(note.file_size)}
+                          </span>
+                        ) : null}
+                        <Download className="size-3 shrink-0 text-muted-foreground" />
+                      </button>
+                    )}
                     <p className="mt-1 text-[10px] text-muted-foreground">
-                      {format(new Date(note.created_at), "MMM d, yyyy HH:mm")}
+                      <span className="font-medium text-foreground/80">
+                        {authorNames[note.user_id] || tSidebar("unknownAuthor")}
+                      </span>
+                      {" · "}
+                      {format(new Date(note.created_at), "dd/MM/yyyy HH:mm")}
                     </p>
                   </div>
                 ))}

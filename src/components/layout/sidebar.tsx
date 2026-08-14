@@ -109,11 +109,14 @@ interface SidebarProps {
   /** Controlled on mobile by the Header's hamburger button. Ignored on lg+. */
   open?: boolean;
   onClose?: () => void;
+  /** Desktop-only: collapse (hide) the sidebar to free horizontal space.
+   *  No effect on mobile, where the drawer is always full width. */
+  collapsed?: boolean;
 }
 
 import { useTranslations } from "next-intl";
 
-export function Sidebar({ open = false, onClose }: SidebarProps) {
+export function Sidebar({ open = false, onClose, collapsed = false }: SidebarProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
   const { profile, profileLoading, account, accountRole, signOut } = useAuth();
@@ -180,7 +183,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           "transition-transform duration-200 ease-out will-change-transform",
           open ? "translate-x-0" : "-translate-x-full",
           // Desktop: static, always visible — reset all the mobile framing.
-          "lg:static lg:z-0 lg:w-60 lg:translate-x-0 lg:transition-none",
+          "lg:static lg:z-0 lg:translate-x-0",
+          // Desktop collapse: animate width/opacity to 0 so the main
+          // content (e.g. the pipeline board) reclaims the full width.
+          "lg:transition-[width,opacity] lg:duration-200 lg:ease-out",
+          collapsed
+            ? "lg:w-0 lg:overflow-hidden lg:border-0 lg:opacity-0 lg:pointer-events-none"
+            : "lg:w-60 lg:opacity-100",
         )}
         aria-label="Primary"
       >
